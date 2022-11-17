@@ -1,15 +1,15 @@
 import express from "express";
-import {MongoClient, ObjectId} from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 import dotenv from "dotenv";
 import cors from "cors";
 import joi from "joi";
 import bcrypt from "bcrypt";
-import {v4 as uuidV4} from 'uuid';
+import { v4 as uuidV4 } from 'uuid';
 
 const userSchema = joi.object({
-    name: joi.string().required().min(3).max(100), 
-    email: joi.string().email().required(), 
-    password: joi.string().required(), 
+    name: joi.string().required().min(3).max(100),
+    email: joi.string().email().required(),
+    password: joi.string().required(),
     confirmedPassword: joi.string().required()
 });
 
@@ -29,24 +29,25 @@ try {
 
 const db = mongoClient.db("myWallet");
 const userCollection = db.collection("users");
+const sessionUser = db.collection("sessions");
 
 // ROTAS:
 
 app.post("/sign-up", async (req, res) => {
     const user = req.body;
 
-    if(user.password !== user.confirmedPassword){
-        res.status(409).send({message: "Confirmação de senha está errada"})
+    if (user.password !== user.confirmedPassword) {
+        res.status(409).send({ message: "Confirmação de senha está errada" })
         return;
     }
 
     try {
-        const userExists = await userCollection.findOne({email: user.email});
+        const userExists = await userCollection.findOne({ email: user.email });
         if (userExists) {
-            return res.status(409).send({message: "Esse email já existe"});
+            return res.status(409).send({ message: "Esse email já existe" });
         }
 
-        const {error} = userSchema.validate(user, {abortEarly: false});
+        const { error } = userSchema.validate(user, { abortEarly: false });
 
         if (error) {
             const errors = error.details.map((detail) => detail.message);
@@ -55,10 +56,10 @@ app.post("/sign-up", async (req, res) => {
 
         const hashPassword = bcrypt.hashSync(user.password, 10);
 
-        const { confirmedPassword, ...rest} = user;
+        const { confirmedPassword, ...rest } = user;
 
         await userCollection.insertOne({
-            ... rest,
+            ...rest,
             password: hashPassword
         });
         res.sendStatus(201);
@@ -68,6 +69,50 @@ app.post("/sign-up", async (req, res) => {
     }
 });
 
-app.listen(process.env.PORT, () => console.log(`Server running in port: ${
-    process.env.PORT
-}`));
+app.post("/sign-in", async (req, res) => {
+    const { email, password } = req.body;
+
+    const token = uuidV4();
+
+    try {
+        const userExists = await userCollection.findOne({ email });
+
+        if (!userExists) {
+            return res.status(409).send({ message: "Esse email não existe" });
+        }
+       
+        const verifiedPassword = bcrypt.compareSync(password, userExists.password);
+
+        if (!verifiedPassword) {
+            return res.status(409).send({ message: "Senha incorreta" });
+        }
+
+        const loggedUser = await sessionUser.findOne({ userId: userExists._id });
+
+        if (loggedUser) {
+            return res.status(401).send({ message: "Você já está logado, sai para logar novamente" });
+        }
+
+        await sessionUser.insertOne({
+            token,
+            userId: userExists._id,
+        });
+
+        res.send({token:token, name:userExists.name});
+
+    } catch (err) {
+        console.log(err)
+        res.sendStatus(401);
+    }
+});
+
+app.get("/sign-up", async (req, res) => {
+    try {
+        const u = await sessionUser.find().toArray();
+        res.send(u);
+    } catch (err) {
+        console.log(err);
+    }
+})
+app.listen(process.env.PORT, () => console.log(`Server running in port: ${process.env.PORT
+    }`));
