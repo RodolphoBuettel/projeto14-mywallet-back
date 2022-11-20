@@ -5,7 +5,7 @@ import dayjs from "dayjs";
 export async function transactions(req, res) {
     const { value, description, type } = req.body;
 
-    const time = dayjs().locale("pt-br").format("HH:mm:ss");
+    const time = dayjs().locale("pt-br").format("DD/MM");
 
     const { error } = schemaTransactions.validate(req.body, { abortEarly: false });
 
@@ -14,7 +14,7 @@ export async function transactions(req, res) {
         return res.status(422).send(errors);
     }
 
-    const { authorization } = req.headers;
+    const { authorization } = req.headers; 
 
     const token = authorization?.replace("Bearer ", "");
 
@@ -23,9 +23,9 @@ export async function transactions(req, res) {
         return;
     };
 
-    const userIdFind = await sessionUser.findOne({ token })
+    const userIdFind = await sessionUser.findOne({ token });
+
     const userId = userIdFind.userId;
-    console.log(userId)
 
     const action = {
         userId,
