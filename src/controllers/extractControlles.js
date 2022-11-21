@@ -29,7 +29,7 @@ export async function transactions(req, res) {
 
     const action = {
         userId,
-        value,
+        value: `${+parseFloat(value).toFixed(2) }`,
         description,
         type,
         time

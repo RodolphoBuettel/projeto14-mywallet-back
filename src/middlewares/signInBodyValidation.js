@@ -20,7 +20,7 @@ export async function signInBodyValidation(req, res, next){
     const loggedUser = await sessionUser.findOne({ userId: userExists._id });
 
     if (loggedUser) {
-        return res.status(401).send({ message: "Você já está logado, sai para logar novamente" });
+        return res.status(409).send({ message: "Você já está logado, sai para logar novamente" });
     }
 
     next();
